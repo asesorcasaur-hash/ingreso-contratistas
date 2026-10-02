@@ -1,0 +1,933 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Registro de autorizaciones · Universidad del Rosario</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📝</text></svg>">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --vino: #7a0f2b; --vino-hondo: #5c0b20;
+    --fondo: #f6f3f1; --papel: #ffffff;
+    --tinta: #231c1e; --tinta-suave: #6b5f62; --linea: #e4dcdc;
+    --ok: #1d6b45; --ok-fondo: #e7f4ec;
+    --mal: #a4261d; --mal-fondo: #fbeae8;
+    --aviso: #875400; --aviso-fondo: #fdf3dd;
+    --radio: 12px;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --vino: #d86a86; --vino-hondo: #e88aa2;
+      --fondo: #171213; --papel: #221b1d;
+      --tinta: #f3ecee; --tinta-suave: #b3a6aa; --linea: #3a2f32;
+      --ok: #7fd4a4; --ok-fondo: #173226;
+      --mal: #f19a92; --mal-fondo: #3a1c1a;
+      --aviso: #f0c46b; --aviso-fondo: #362a12;
+    }
+  }
+  *, *::before, *::after { box-sizing: inherit; }
+  html, body { margin: 0; }
+  body {
+    background: var(--fondo); color: var(--tinta);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 16px; line-height: 1.45; min-height: 100vh;
+  }
+  .barra {
+    background: var(--vino); color: #fff;
+    padding: 12px 20px; font-size: 15px;
+    display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  @media (prefers-color-scheme: dark) { .barra { background: #4a0a1b; } }
+  .barra b { font-weight: 650; }
+  .barra button {
+    background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.5);
+    border-radius: 8px; padding: 5px 12px; font: inherit; font-size: 14px; cursor: pointer;
+  }
+  .oculto { display: none !important; }
+
+  .contenedor { max-width: 1600px; margin: 24px auto 40px; padding: 0 16px; }
+  .rejilla { display: grid; grid-template-columns: minmax(330px, 390px) minmax(0, 1fr); gap: 20px; align-items: start; }
+  @media (max-width: 1100px) { .rejilla { grid-template-columns: minmax(0, 1fr); } }
+
+  .tarjeta { background: var(--papel); border: 1px solid var(--linea); border-radius: 18px; padding: 22px; }
+  h1 { margin: 0 0 4px; font-size: 24px; line-height: 1.2; color: var(--vino-hondo); }
+  h2 { margin: 0; font-size: 19px; color: var(--vino-hondo); }
+  .sub { margin: 0 0 18px; color: var(--tinta-suave); font-size: 15px; }
+
+  label { display: block; font-size: 14px; font-weight: 600; margin: 14px 0 5px; }
+  label .opc { font-weight: 400; color: var(--tinta-suave); }
+  input {
+    width: 100%; font: inherit; padding: 10px 12px;
+    border: 2px solid var(--linea); border-radius: var(--radio);
+    background: var(--papel); color: var(--tinta); outline: none;
+  }
+  input:focus { border-color: var(--vino); }
+  input.grande { font-size: 22px; font-variant-numeric: tabular-nums; letter-spacing: .03em; }
+  button:focus-visible, input:focus-visible { outline: 3px solid var(--vino); outline-offset: 2px; }
+
+  .principal {
+    width: 100%; margin-top: 20px; padding: 13px; border: 0; border-radius: var(--radio);
+    background: var(--vino); color: #fff; font: inherit; font-weight: 650; font-size: 17px; cursor: pointer;
+  }
+  @media (prefers-color-scheme: dark) { .principal { background: #9c1c3c; } }
+  .principal:disabled { opacity: .6; cursor: progress; }
+
+  .nota { margin-top: 8px; padding: 9px 12px; border-radius: 10px; font-size: 14px; }
+  .nota.ok { background: var(--ok-fondo); color: var(--ok); }
+  .nota.mal { background: var(--mal-fondo); color: var(--mal); }
+  .nota.aviso { background: var(--aviso-fondo); color: var(--aviso); }
+  .nota:empty { display: none; }
+
+  .cabecera-lista { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+  .cabecera-lista span { font-size: 14px; color: var(--tinta-suave); }
+  .tabla-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; font-weight: 600; color: var(--tinta-suave); padding: 8px 10px; border-bottom: 2px solid var(--linea); white-space: nowrap; }
+  td { padding: 9px 10px; border-bottom: 1px solid var(--linea); vertical-align: top; }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr.anulado td { color: var(--tinta-suave); }
+  tr.anulado td.tachable { text-decoration: line-through; }
+  .motivo { display: block; font-size: 13px; color: var(--mal); text-decoration: none; }
+  .anular {
+    background: none; border: 1px solid var(--linea); color: var(--mal);
+    border-radius: 8px; padding: 3px 10px; font: inherit; font-size: 13px; cursor: pointer;
+  }
+  .vacio { padding: 28px 10px; text-align: center; color: var(--tinta-suave); }
+
+  .login { max-width: 400px; margin: 60px auto; }
+  .col-izq, .col-der { display: grid; gap: 20px; align-content: start; min-width: 0; }
+  .tarjeta { min-width: 0; }
+  .fechas { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+  .fechas > div { min-width: 0; }
+  input[type="date"], input[type="month"] { min-width: 0; }
+  #lista td:nth-child(3), #lista td:nth-child(4) { min-width: 120px; }
+  #lista td:nth-child(7) { word-break: break-all; min-width: 80px; }
+  .fechas label { margin-top: 14px; }
+  .fila-rep { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; margin-top: 12px; }
+  .fila-rep > div { flex: 1; min-width: 160px; }
+  .fila-rep label { margin-top: 0; }
+  .decision { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .decision button { padding: 12px; border: 2px solid var(--linea); border-radius: var(--radio); background: var(--papel); color: var(--tinta-suave); font: inherit; font-weight: 700; font-size: 16px; cursor: pointer; }
+  .decision button.si.activo { border-color: var(--ok); background: var(--ok-fondo); color: var(--ok); }
+  .decision button.no.activo { border-color: var(--mal); background: var(--mal-fondo); color: var(--mal); }
+  .principal.rechazo { background: var(--mal); }
+  .motivo-dec { display: block; font-size: 12px; color: var(--tinta-suave); margin-top: 2px; }
+  .archivo { display: block; margin-top: 12px; padding: 18px; border: 2px dashed var(--linea); border-radius: var(--radio); text-align: center; cursor: pointer; color: var(--tinta-suave); font-size: 15px; }
+  .archivo:hover { border-color: var(--vino); color: var(--tinta); }
+  .archivo input { display: none; }
+  .cambiar-modo { display: block; margin: 14px auto 0; background: none; border: 0; color: var(--vino); font: inherit; font-size: 15px; font-weight: 600; text-decoration: underline; cursor: pointer; }
+  .fila-form { display: grid; grid-template-columns: 1.4fr 1fr auto auto; gap: 10px; align-items: end; }
+  .fila-form label { margin-top: 0; }
+  @media (max-width: 760px) { .fila-form { grid-template-columns: 1fr; } }
+  .check { display: flex; align-items: center; gap: 6px; font-weight: 500; margin: 0 0 12px; white-space: nowrap; }
+  .check input { width: auto; }
+  .secundario { padding: 10px 18px; border: 0; border-radius: var(--radio); background: var(--vino); color: #fff; font: inherit; font-weight: 650; cursor: pointer; white-space: nowrap; }
+  @media (prefers-color-scheme: dark) { .secundario { background: #9c1c3c; } }
+  .chip { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+  .chip.ok { background: var(--ok-fondo); color: var(--ok); }
+  .chip.mal { background: var(--mal-fondo); color: var(--mal); }
+  .chip.aviso { background: var(--aviso-fondo); color: var(--aviso); }
+  textarea { width: 100%; font: inherit; font-size: 15px; padding: 10px 12px; border: 2px solid var(--linea); border-radius: var(--radio); background: var(--papel); color: var(--tinta); outline: none; resize: vertical; min-height: 150px; }
+  textarea:focus { border-color: var(--vino); }
+  .varios { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--linea); }
+  .varios summary { cursor: pointer; font-weight: 650; color: var(--vino-hondo); }
+  .varios .ayuda { font-size: 14px; color: var(--tinta-suave); margin: 8px 0; }
+  .varios .ayuda code { background: var(--fondo); padding: 1px 5px; border-radius: 4px; }
+  .fila-varios { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-top: 10px; }
+  .fila-varios .check { margin: 0; }
+  .acciones { display: flex; gap: 6px; flex-wrap: wrap; }
+  .accion { background: none; border: 1px solid var(--linea); color: var(--tinta); border-radius: 8px; padding: 3px 10px; font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; }
+  .barra .grupo { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+  <div class="barra">
+    <span><b>Universidad del Rosario</b> · Registro de autorizaciones de ingreso</span>
+    <span id="sesion" class="oculto grupo"><span id="usuario"></span>
+      <button type="button" id="btn-usuarios" class="oculto">Usuarios</button>
+      <button type="button" id="btn-clave">Cambiar mi contraseña</button>
+      <button type="button" id="salir">Cerrar sesión</button></span>
+  </div>
+
+  <!-- ====== INGRESO ====== -->
+  <section id="vista-login" class="tarjeta login oculto">
+    <h1 id="titulo-login">Iniciar sesión</h1>
+    <p class="sub" id="sub-login">Solo para el equipo que registra autorizaciones.</p>
+    <label for="correo">Correo institucional</label>
+    <input id="correo" type="email" autocomplete="username">
+    <label for="clave">Contraseña</label>
+    <input id="clave" type="password" autocomplete="current-password">
+    <div id="grupo-clave2" class="oculto">
+      <label for="clave2">Repita la contraseña</label>
+      <input id="clave2" type="password" autocomplete="new-password">
+    </div>
+    <button type="button" class="principal" id="entrar">Entrar</button>
+    <div class="nota" id="nota-login"></div>
+    <button type="button" class="cambiar-modo" id="cambiar-modo">Primera vez: crear mi contraseña</button>
+  </section>
+
+  <!-- ====== FORMULARIO ====== -->
+  <div id="vista-app" class="contenedor oculto">
+    <div class="rejilla">
+      <div class="col-izq">
+      <section class="tarjeta">
+        <h1>Nueva autorización</h1>
+        <p class="sub">Apenas la registre, el vigilante la ve en la consulta de ingreso.</p>
+
+        <label for="f-cedula">Número de documento</label>
+        <input id="f-cedula" class="grande" type="text" inputmode="numeric" autocomplete="off" maxlength="20" placeholder="Sin puntos ni comas">
+        <div class="nota" id="nota-cedula"></div>
+
+        <label for="f-nombre">Nombre completo</label>
+        <input id="f-nombre" type="text" autocomplete="off">
+
+        <label for="f-empresa">Empresa</label>
+        <input id="f-empresa" type="text" list="empresas" autocomplete="off">
+        <datalist id="empresas"></datalist>
+
+        <label for="f-nit">NIT <span class="opc">(opcional)</span></label>
+        <input id="f-nit" type="text" autocomplete="off">
+
+        <label>Decisión</label>
+        <div class="decision" role="group" aria-label="Decisión">
+          <button type="button" class="si activo" id="d-si" aria-pressed="true">✓ Autoriza</button>
+          <button type="button" class="no" id="d-no" aria-pressed="false">✕ No autoriza</button>
+        </div>
+
+        <div id="grupo-vigencia">
+          <div class="fechas">
+            <div><label for="f-desde">Acceso desde</label><input id="f-desde" type="date"></div>
+            <div><label for="f-vigencia">Acceso hasta</label><input id="f-vigencia" type="date"></div>
+          </div>
+          <p class="pista" style="margin:6px 0 0;font-size:13px;color:var(--tinta-suave)">«Hasta» es el último día que puede entrar (vigencia de la seguridad social). Al día siguiente el vigilante verá SIN ACCESO.</p>
+
+          <label for="f-induccion">Inducción SST realizada el <span class="opc">(opcional, si ya la hizo)</span></label>
+          <input id="f-induccion" type="date">
+        </div>
+
+        <div id="grupo-motivo" class="oculto">
+          <label for="f-motivo">Motivo por el que no se autoriza <span class="opc">(no lo ve el vigilante)</span></label>
+          <textarea id="f-motivo" style="min-height:80px" placeholder="Ej: planilla de seguridad social sin pago del mes"></textarea>
+        </div>
+
+        <button type="button" class="principal" id="registrar">Registrar autorización</button>
+        <div class="nota" id="nota-form"></div>
+      </section>
+
+      <section class="tarjeta">
+        <h2>Cargar inducciones</h2>
+        <p class="sub" style="margin:6px 0 0">Suba el Excel que exporta del Forms de inducción. Puede subir el archivo completo cada vez: las inducciones que ya estaban no se duplican.</p>
+        <label class="archivo" id="zona-archivo">
+          <input type="file" id="i-archivo" accept=".xlsx,.xls,.csv">
+          <span id="i-texto">📄 Haga clic aquí para elegir el Excel</span>
+        </label>
+        <div class="nota" id="nota-ind"></div>
+        <button type="button" class="principal oculto" id="i-cargar">Cargar inducciones</button>
+      </section>
+      </div>
+
+      <div class="col-der">
+      <section class="tarjeta">
+        <div class="cabecera-lista">
+          <h2>Registradas hoy</h2>
+          <span id="conteo"></span>
+        </div>
+        <div class="tabla-wrap">
+          <table>
+            <thead><tr><th>Hora</th><th>Documento</th><th>Nombre</th><th>Empresa</th><th>Decisión</th><th>Periodo</th><th>Registró</th><th></th></tr></thead>
+            <tbody id="lista"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="tarjeta">
+        <h2>Reporte de cierre</h2>
+        <p class="sub" style="margin:6px 0 0">Descarga en Excel todo lo registrado en el formulario durante el mes: autorizaciones, no autorizaciones y anulaciones, con quién las hizo. Incluye una hoja de resumen por gestor.</p>
+        <div class="fila-rep">
+          <div><label for="r-mes">Mes</label><input id="r-mes" type="month"></div>
+          <button type="button" class="secundario" id="r-descargar">Descargar reporte</button>
+        </div>
+        <div class="nota" id="nota-rep"></div>
+      </section>
+
+      <section class="tarjeta">
+        <h2>Cargar histórico 2026</h2>
+        <p class="sub" style="margin:6px 0 0">Suba el Excel con las autorizaciones anteriores. Debe tener al menos el documento y la fecha de vigencia (hasta). Si lo sube dos veces, no se duplica. Lo registrado en el formulario siempre tiene prioridad sobre el histórico.</p>
+        <label class="archivo">
+          <input type="file" id="h-archivo" accept=".xlsx,.xls,.csv">
+          <span id="h-texto">📄 Haga clic aquí para elegir el Excel del histórico</span>
+        </label>
+        <div class="nota" id="nota-hist"></div>
+        <button type="button" class="principal oculto" id="h-cargar">Cargar histórico</button>
+      </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== USUARIOS (solo administradores) ====== -->
+  <div id="vista-usuarios" class="contenedor oculto">
+    <section class="tarjeta" style="margin-bottom:20px">
+      <div class="cabecera-lista">
+        <h1 style="margin:0">Usuarios</h1>
+        <button type="button" class="accion" id="volver">← Volver al registro</button>
+      </div>
+      <p class="sub">Agregue el correo de la persona. Luego ella entra al enlace, elige «Primera vez: crear mi contraseña» y queda lista.</p>
+      <div class="fila-form">
+        <div><label for="u-email">Correo</label><input id="u-email" type="email" autocomplete="off"></div>
+        <div><label for="u-nombre">Nombre</label><input id="u-nombre" type="text" autocomplete="off"></div>
+        <label class="check"><input id="u-admin" type="checkbox"> Administrador</label>
+        <button type="button" class="secundario" id="u-agregar" style="margin-bottom:2px">Agregar</button>
+      </div>
+      <div class="nota" id="nota-usuarios"></div>
+
+      <details class="varios" id="varios">
+        <summary>Agregar varios correos a la vez</summary>
+        <p class="ayuda">Pegue un correo por línea. Si quiere, agregue el nombre después de una coma, así:<br>
+          <code>maria.lopez@urosario.edu.co, María López</code><br>
+          También puede copiar dos columnas (correo y nombre) directamente desde Excel.</p>
+        <textarea id="v-lista" placeholder="correo1@urosario.edu.co, Nombre 1&#10;correo2@urosario.edu.co, Nombre 2&#10;correo3@urosario.edu.co"></textarea>
+        <div class="fila-varios">
+          <label class="check"><input id="v-admin" type="checkbox"> Todos como administradores</label>
+          <button type="button" class="secundario" id="v-agregar">Agregar todos</button>
+        </div>
+        <div class="nota" id="nota-varios"></div>
+      </details>
+    </section>
+    <section class="tarjeta">
+      <div class="tabla-wrap">
+        <table>
+          <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th><th>Cuenta</th><th></th></tr></thead>
+          <tbody id="lista-usuarios"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+<script>
+  // ==================== CONFIGURACIÓN ====================
+  const SUPABASE_URL = 'https://oichmbiwurtzcxmydoiq.supabase.co'
+  const SUPABASE_KEY = 'sb_publishable_RFmCbBs8UOMMPi5SPmyi6A_r2RRsaAI'   // la MISMA clave pública del index.html
+  // =======================================================
+
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+  const $ = id => document.getElementById(id)
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]))
+  const fecha = iso => { if (!iso) return '—'; const [y, m, d] = iso.slice(0, 10).split('-'); return `${d}/${m}/${y}` }
+  const hora = ts => new Date(ts).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+  const limpiarDoc = v => v.replace(/[^0-9A-Za-z]/g, '')
+  const hoyISO = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10) }
+  const nota = (id, texto, clase = '') => { const el = $(id); el.className = 'nota ' + clase; el.textContent = texto || '' }
+
+  let empresas = new Map()
+  let refresco = null
+  let soyAdmin = false
+  let autoriza = true
+
+  function fijarDecision(si) {
+    autoriza = si
+    $('d-si').classList.toggle('activo', si); $('d-si').setAttribute('aria-pressed', si)
+    $('d-no').classList.toggle('activo', !si); $('d-no').setAttribute('aria-pressed', !si)
+    $('grupo-vigencia').classList.toggle('oculto', !si)
+    $('grupo-motivo').classList.toggle('oculto', si)
+    $('registrar').textContent = si ? 'Registrar autorización' : 'Registrar NO autorización'
+    $('registrar').classList.toggle('rechazo', !si)
+    if (!si) $('f-motivo').focus()
+  }
+  let modoCrear = false
+
+  // ---------------- Sesión ----------------
+  async function verificarSesion() {
+    const { data: { session } } = await sb.auth.getSession()
+    if (!session) return mostrarLogin()
+    const { data: rol, error } = await sb.rpc('mi_rol')
+    if (error || !rol?.gestor) {
+      await sb.auth.signOut()
+      mostrarLogin()
+      nota('nota-login', 'Este usuario no tiene permiso para registrar. Pida que lo agreguen a la lista de gestores.', 'mal')
+      return
+    }
+    soyAdmin = !!rol.admin
+    $('usuario').textContent = session.user.email
+    $('btn-usuarios').classList.toggle('oculto', !soyAdmin)
+    $('sesion').classList.remove('oculto')
+    $('vista-login').classList.add('oculto')
+    $('vista-usuarios').classList.add('oculto')
+    $('vista-app').classList.remove('oculto')
+    cargarEmpresas()
+    cargarLista()
+    clearInterval(refresco)
+    refresco = setInterval(cargarLista, 30000)
+    $('f-cedula').focus()
+  }
+
+  function mostrarLogin() {
+    clearInterval(refresco)
+    $('sesion').classList.add('oculto')
+    $('vista-app').classList.add('oculto')
+    $('vista-usuarios').classList.add('oculto')
+    $('vista-login').classList.remove('oculto')
+    $('correo').focus()
+  }
+
+  function alternarModo() {
+    modoCrear = !modoCrear
+    $('titulo-login').textContent = modoCrear ? 'Crear mi contraseña' : 'Iniciar sesión'
+    $('sub-login').textContent = modoCrear
+      ? 'Use el correo que le autorizaron y elija una contraseña de al menos 8 caracteres.'
+      : 'Solo para el equipo que registra autorizaciones.'
+    $('entrar').textContent = modoCrear ? 'Crear cuenta' : 'Entrar'
+    $('cambiar-modo').textContent = modoCrear ? 'Ya tengo contraseña: iniciar sesión' : 'Primera vez: crear mi contraseña'
+    $('grupo-clave2').classList.toggle('oculto', !modoCrear)
+    $('clave').autocomplete = modoCrear ? 'new-password' : 'current-password'
+    nota('nota-login', '')
+  }
+
+  async function crearCuenta() {
+    const email = $('correo').value.trim().toLowerCase(), password = $('clave').value
+    if (!email || !password) return nota('nota-login', 'Escriba el correo y la contraseña.', 'mal')
+    if (password.length < 8) return nota('nota-login', 'La contraseña debe tener al menos 8 caracteres.', 'mal')
+    if (password !== $('clave2').value) return nota('nota-login', 'Las contraseñas no coinciden.', 'mal')
+    $('entrar').disabled = true
+    const { data, error } = await sb.auth.signUp({ email, password })
+    $('entrar').disabled = false
+    if (error) {
+      const m = error.message || ''
+      if (/already|registered|exists/i.test(m)) return nota('nota-login', 'Este correo ya tiene cuenta. Inicie sesión, o pida a un administrador que le restablezca la contraseña.', 'aviso')
+      if (/database|saving|autorizado/i.test(m)) return nota('nota-login', 'Este correo no ha sido autorizado. Pida a un administrador que lo agregue en «Usuarios».', 'mal')
+      return nota('nota-login', 'No se pudo crear la cuenta: ' + m, 'mal')
+    }
+    $('clave').value = $('clave2').value = ''
+    if (!data.session) return nota('nota-login', 'Cuenta creada. Revise su correo para confirmarla y luego inicie sesión.', 'ok')
+    alternarModo()
+    verificarSesion()
+  }
+
+  async function cambiarMiClave() {
+    const nueva = prompt('Escriba su nueva contraseña (mínimo 8 caracteres):')
+    if (nueva === null) return
+    if (nueva.length < 8) return alert('La contraseña debe tener al menos 8 caracteres.')
+    const { error } = await sb.auth.updateUser({ password: nueva })
+    alert(error ? 'No se pudo cambiar: ' + error.message : 'Contraseña actualizada.')
+  }
+
+  // ---------------- Usuarios (administradores) ----------------
+  function abrirUsuarios() {
+    $('vista-app').classList.add('oculto')
+    $('vista-usuarios').classList.remove('oculto')
+    nota('nota-usuarios', '')
+    cargarUsuarios()
+    $('u-email').focus()
+  }
+
+  function cerrarUsuarios() {
+    $('vista-usuarios').classList.add('oculto')
+    $('vista-app').classList.remove('oculto')
+    $('f-cedula').focus()
+  }
+
+  async function cargarUsuarios() {
+    const { data, error } = await sb.rpc('listar_gestores')
+    if (error) { $('lista-usuarios').innerHTML = `<tr><td colspan="6" class="vacio">${esc(error.message)}</td></tr>`; return }
+    const yo = ($('usuario').textContent || '').toLowerCase()
+    $('lista-usuarios').innerHTML = data.map(u => {
+      const esYo = u.email === yo
+      return `<tr class="${u.activo ? '' : 'anulado'}">
+        <td>${esc(u.nombre || '—')}${esYo ? ' <span class="chip ok">usted</span>' : ''}</td>
+        <td>${esc(u.email)}</td>
+        <td>${u.es_admin ? 'Administrador' : 'Gestor'}</td>
+        <td>${u.activo ? '<span class="chip ok">Activo</span>' : '<span class="chip mal">Inactivo</span>'}</td>
+        <td>${u.tiene_cuenta ? '<span class="chip ok">Creada</span>' : '<span class="chip aviso">Pendiente</span>'}</td>
+        <td>${esYo ? '' : `<div class="acciones">
+          <button type="button" class="accion" data-u="estado" data-email="${esc(u.email)}" data-activo="${u.activo}" data-admin="${u.es_admin}">${u.activo ? 'Desactivar' : 'Activar'}</button>
+          <button type="button" class="accion" data-u="rol" data-email="${esc(u.email)}" data-activo="${u.activo}" data-admin="${u.es_admin}">${u.es_admin ? 'Quitar admin' : 'Hacer admin'}</button>
+          ${u.tiene_cuenta ? `<button type="button" class="accion" data-u="clave" data-email="${esc(u.email)}">Contraseña temporal</button>` : ''}
+        </div>`}</td>
+      </tr>`
+    }).join('') || `<tr><td colspan="6" class="vacio">No hay usuarios.</td></tr>`
+  }
+
+  async function agregarUsuario() {
+    const email = $('u-email').value.trim(), nombre = $('u-nombre').value.trim()
+    if (!email) return nota('nota-usuarios', 'Escriba el correo.', 'mal')
+    $('u-agregar').disabled = true
+    const { error } = await sb.rpc('agregar_gestor', { p_email: email, p_nombre: nombre, p_admin: $('u-admin').checked })
+    $('u-agregar').disabled = false
+    if (error) return nota('nota-usuarios', error.message, 'mal')
+    nota('nota-usuarios', `Listo. Envíele a ${email} el enlace de esta página y dígale que elija «Primera vez: crear mi contraseña».`, 'ok')
+    $('u-email').value = $('u-nombre').value = ''
+    $('u-admin').checked = false
+    cargarUsuarios()
+  }
+
+  async function agregarVarios() {
+    const lineas = $('v-lista').value.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
+    if (!lineas.length) return nota('nota-varios', 'Pegue al menos un correo.', 'mal')
+    const admin = $('v-admin').checked
+    const vistos = new Set()
+    let agregados = 0
+    const repetidos = [], invalidos = [], otros = []
+    $('v-agregar').disabled = true
+    for (let i = 0; i < lineas.length; i++) {
+      nota('nota-varios', `Agregando ${i + 1} de ${lineas.length}…`, 'aviso')
+      const partes = lineas[i].split(/[,;\t]/)
+      const email = (partes.shift() || '').trim().toLowerCase()
+      const nombre = partes.join(' ').trim()
+      if (!email || /^correo|^email/i.test(email)) continue          // encabezado de Excel
+      if (vistos.has(email)) continue
+      vistos.add(email)
+      const { error } = await sb.rpc('agregar_gestor', { p_email: email, p_nombre: nombre, p_admin: admin })
+      if (!error) agregados++
+      else if (/ya está/i.test(error.message)) repetidos.push(email)
+      else if (/no es válido/i.test(error.message)) invalidos.push(lineas[i])
+      else otros.push(`${email}: ${error.message}`)
+    }
+    $('v-agregar').disabled = false
+    const partesMsg = [`${agregados} agregado${agregados === 1 ? '' : 's'}.`]
+    if (repetidos.length) partesMsg.push(`Ya estaban en la lista: ${repetidos.join(', ')}.`)
+    if (invalidos.length) partesMsg.push(`Correos no válidos (revíselos): ${invalidos.join(' | ')}.`)
+    if (otros.length) partesMsg.push(`Con error: ${otros.join(' | ')}.`)
+    nota('nota-varios', partesMsg.join(' '), invalidos.length || otros.length ? 'aviso' : 'ok')
+    if (!invalidos.length && !otros.length) $('v-lista').value = ''
+    cargarUsuarios()
+  }
+
+  async function accionUsuario(b) {
+    const email = b.dataset.email
+    const activo = b.dataset.activo === 'true', admin = b.dataset.admin === 'true'
+    let error
+    if (b.dataset.u === 'estado') {
+      if (activo && !confirm(`¿Desactivar a ${email}? No podrá entrar ni registrar hasta que lo active de nuevo.`)) return
+      ;({ error } = await sb.rpc('cambiar_gestor', { p_email: email, p_activo: !activo, p_admin: admin }))
+    } else if (b.dataset.u === 'rol') {
+      ;({ error } = await sb.rpc('cambiar_gestor', { p_email: email, p_activo: activo, p_admin: !admin }))
+    } else {
+      const clave = prompt(`Contraseña temporal para ${email} (mínimo 8 caracteres).\nDígasela a la persona y pídale que la cambie con «Cambiar mi contraseña».`)
+      if (clave === null) return
+      ;({ error } = await sb.rpc('restablecer_clave', { p_email: email, p_clave: clave }))
+      if (!error) alert('Contraseña temporal asignada.')
+    }
+    if (error) return alert(error.message)
+    cargarUsuarios()
+  }
+
+  async function entrar() {
+    const email = $('correo').value.trim(), password = $('clave').value
+    if (!email || !password) return nota('nota-login', 'Escriba el correo y la contraseña.', 'mal')
+    $('entrar').disabled = true
+    nota('nota-login', '')
+    const { error } = await sb.auth.signInWithPassword({ email, password })
+    $('entrar').disabled = false
+    if (error) return nota('nota-login', 'Correo o contraseña incorrectos.', 'mal')
+    $('clave').value = ''
+    verificarSesion()
+  }
+
+  // ---------------- Datos ----------------
+  async function cargarEmpresas() {
+    const { data } = await sb.from('vw_ss_registros').select('empresa, nit').not('empresa', 'is', null).limit(5000)
+    empresas = new Map()
+    for (const r of data || []) if (r.empresa && !empresas.has(r.empresa)) empresas.set(r.empresa, r.nit)
+    $('empresas').innerHTML = [...empresas.keys()].sort().map(e => `<option value="${esc(e)}">`).join('')
+  }
+
+  async function buscarCedula() {
+    const doc = limpiarDoc($('f-cedula').value)
+    $('f-cedula').value = doc
+    if (!doc) return nota('nota-cedula', '')
+    const { data: filas, error } = await sb.from('vw_ss_registros')
+      .select('nombre, nit, empresa, vigencia, vigencia_desde, decision, motivo, prioridad, fecha_cargue')
+      .eq('cedula', doc).eq('anulado', false)
+      .order('prioridad', { ascending: false }).order('fecha_cargue', { ascending: false }).limit(200)
+    if (error) return nota('nota-cedula', 'No se pudo verificar el documento.', 'mal')
+    const data = elegirVigente(filas)
+    if (!data.length) return nota('nota-cedula', 'Contratista nuevo: complete los datos. ' + await ultimaInduccion(doc), 'aviso')
+    const r = data[0]
+    const ind = await ultimaInduccion(doc)
+    if (!$('f-nombre').value) $('f-nombre').value = r.nombre || ''
+    if (!$('f-empresa').value) $('f-empresa').value = r.empresa || ''
+    if (!$('f-nit').value) $('f-nit').value = r.nit || ''
+    if (r.decision === 'NO_AUTORIZADO') {
+      return nota('nota-cedula', `Su última decisión fue NO AUTORIZADO (${r.motivo || 'sin motivo'}). Si registra de nuevo, queda la nueva decisión. ${ind}`, 'mal')
+    }
+    const vigente = r.vigencia && r.vigencia >= hoyISO()
+    nota('nota-cedula',
+      (vigente ? `Ya está autorizado${r.vigencia_desde ? ' del ' + fecha(r.vigencia_desde) : ''} hasta el ${fecha(r.vigencia)}. Si registra de nuevo, queda la nueva decisión.`
+               : `Ya existe. Su última vigencia fue el ${fecha(r.vigencia)}.`) + ' ' + ind,
+      vigente ? 'ok' : 'aviso')
+  }
+
+  // Igual que la consulta del vigilante: manda el último registro del formulario; si no hay, el histórico con vigencia más lejana
+  function elegirVigente(filas) {
+    if (!filas || !filas.length) return []
+    const form = filas.filter(f => f.prioridad === 1)
+    if (form.length) return [form.sort((a, b) => b.fecha_cargue.localeCompare(a.fecha_cargue))[0]]
+    return [filas.sort((a, b) => (b.vigencia || '').localeCompare(a.vigencia || ''))[0]]
+  }
+
+  async function ultimaInduccion(doc) {
+    const { data } = await sb.from('inducciones').select('fecha_ejecucion')
+      .eq('cedula', doc).not('fecha_ejecucion', 'is', null)
+      .order('fecha_ejecucion', { ascending: false }).limit(1)
+    if (!data || !data.length) return 'Inducción: pendiente.'
+    const venc = new Date(data[0].fecha_ejecucion + 'T00:00:00'); venc.setDate(venc.getDate() + 365)
+    const vencISO = `${venc.getFullYear()}-${String(venc.getMonth() + 1).padStart(2, '0')}-${String(venc.getDate()).padStart(2, '0')}`
+    return vencISO >= hoyISO() ? `Inducción vigente hasta el ${fecha(vencISO)}.` : `Inducción vencida desde el ${fecha(vencISO)}.`
+  }
+
+  async function registrar() {
+    const registro = {
+      cedula: limpiarDoc($('f-cedula').value),
+      nombre: $('f-nombre').value.trim(),
+      empresa: $('f-empresa').value.trim() || null,
+      nit: $('f-nit').value.trim() || null,
+      decision: autoriza ? 'AUTORIZADO' : 'NO_AUTORIZADO',
+      vigencia: autoriza ? $('f-vigencia').value : null,
+      vigencia_desde: autoriza ? ($('f-desde').value || null) : null,
+      motivo: autoriza ? null : $('f-motivo').value.trim()
+    }
+    if (!registro.cedula) return campoFaltante('f-cedula', 'Falta el número de documento.')
+    if (!registro.nombre) return campoFaltante('f-nombre', 'Falta el nombre.')
+    if (autoriza && !registro.vigencia) return campoFaltante('f-vigencia', 'Falta la fecha «Acceso hasta».')
+    if (autoriza && registro.vigencia_desde && registro.vigencia_desde > registro.vigencia) return campoFaltante('f-desde', '«Acceso desde» no puede ser posterior a «Acceso hasta».')
+    if (!autoriza && !registro.motivo) return campoFaltante('f-motivo', 'Escriba el motivo por el que no se autoriza.')
+    if (autoriza && registro.vigencia < hoyISO() &&
+        !confirm(`La fecha ${fecha(registro.vigencia)} ya pasó: el vigilante verá NO AUTORIZADO. ¿Registrar de todas formas?`)) return
+
+    $('registrar').disabled = true
+    const { error } = await sb.from('ss_contratistas').insert(registro)
+    $('registrar').disabled = false
+    if (error) return nota('nota-form', 'No se pudo registrar: ' + error.message, 'mal')
+
+    let extra = ''
+    const fInd = autoriza ? $('f-induccion').value : ''
+    if (fInd) {
+      const { error: eInd } = await sb.from('inducciones')
+        .upsert({ cedula: registro.cedula, nombre: registro.nombre, fecha_ejecucion: fInd },
+                { onConflict: 'cedula,fecha_ejecucion', ignoreDuplicates: true })
+      extra = eInd ? ` Ojo: la inducción no se pudo guardar (${eInd.message}).` : ` Inducción registrada el ${fecha(fInd)}.`
+    }
+    if (autoriza) nota('nota-form', `Registrado: ${registro.nombre}, autorizado${registro.vigencia_desde ? ' del ' + fecha(registro.vigencia_desde) : ''} hasta el ${fecha(registro.vigencia)}.${extra} El vigilante ya lo puede consultar.`, extra.startsWith(' Ojo') ? 'aviso' : 'ok')
+    else nota('nota-form', `Registrado: ${registro.nombre} NO autorizado. El vigilante verá NO AUTORIZADO.`, 'ok')
+    $('f-induccion').value = ''
+    $('f-motivo').value = ''
+    $('f-desde').value = hoyISO()
+    fijarDecision(true)
+    if (registro.empresa && !empresas.has(registro.empresa)) cargarEmpresas()
+    for (const id of ['f-cedula', 'f-nombre', 'f-empresa', 'f-nit']) $(id).value = ''
+    nota('nota-cedula', '')
+    $('f-cedula').focus()
+    cargarLista()
+  }
+
+  // ---------------- Carga de inducciones (Excel del Forms) ----------------
+  let indPendientes = []
+  const normTxt = t => String(t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim()
+  const isoLocal = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+  function aFecha(v) {
+    if (v === null || v === undefined || v === '') return null
+    if (v instanceof Date) return isNaN(v) ? null : isoLocal(v)
+    if (typeof v === 'number') { const p = XLSX.SSF.parse_date_code(v); return p ? `${p.y}-${String(p.m).padStart(2, '0')}-${String(p.d).padStart(2, '0')}` : null }
+    const t = String(v).trim()
+    let m = t.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/)
+    if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`
+    m = t.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})/)
+    if (m) { const y = m[3].length === 2 ? '20' + m[3] : m[3]; return `${y}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` }
+    return null
+  }
+
+  async function leerInducciones(file) {
+    indPendientes = []
+    $('i-cargar').classList.add('oculto')
+    $('i-texto').textContent = '📄 ' + file.name
+    nota('nota-ind', 'Leyendo el archivo…', 'aviso')
+    let filas
+    try {
+      const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true })
+      filas = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: null })
+    } catch (e) { return nota('nota-ind', 'No se pudo leer el archivo. Verifique que sea el Excel del Forms.', 'mal') }
+
+    let h = -1, cDoc = -1, cNom = -1, cFec = -1
+    for (let i = 0; i < Math.min(filas.length, 10) && h < 0; i++) {
+      const cab = filas[i].map(normTxt)
+      cDoc = cab.findIndex(c => c.includes('numero de identificacion'))
+      if (cDoc < 0) cDoc = cab.findIndex(c => c.includes('identificacion') || c === 'cedula' || c.includes('documento'))
+      cFec = cab.findIndex(c => c.includes('fecha de ejecucion'))
+      if (cFec < 0) cFec = cab.findIndex(c => c.includes('fecha') && !c.includes('hora de inicio') && !c.includes('finalizacion'))
+      cNom = cab.findIndex(c => c.includes('nombre completo'))
+      if (cNom < 0) cNom = cab.findIndex(c => c === 'nombre' || c.startsWith('nombre'))
+      if (cDoc >= 0 && cFec >= 0) h = i
+    }
+    if (h < 0) return nota('nota-ind', 'No encontré las columnas «Número de identificación» y «Fecha de ejecución de la actividad». Revise que sea el Excel correcto.', 'mal')
+
+    const vistos = new Set(), malas = []
+    for (let i = h + 1; i < filas.length; i++) {
+      const f = filas[i]
+      if (!f || f.every(x => x === null || x === '')) continue
+      let doc = f[cDoc]
+      if (typeof doc === 'number' && Number.isInteger(doc)) doc = String(doc)
+      doc = String(doc ?? '').trim().replace(/\.0+$/, '').replace(/[^0-9A-Za-z]/g, '')
+      const fe = aFecha(f[cFec])
+      if (!doc || !fe) { malas.push(i + 1); continue }
+      const clave = doc + '|' + fe
+      if (vistos.has(clave)) continue
+      vistos.add(clave)
+      indPendientes.push({ cedula: doc, nombre: cNom >= 0 && f[cNom] ? String(f[cNom]).trim() : null, fecha_ejecucion: fe })
+    }
+    if (!indPendientes.length) return nota('nota-ind', 'El archivo no tiene filas válidas con documento y fecha.', 'mal')
+    nota('nota-ind', `Encontré ${indPendientes.length} inducciones.` + (malas.length ? ` ${malas.length} fila(s) sin documento o fecha se omitirán (filas ${malas.slice(0, 10).join(', ')}${malas.length > 10 ? '…' : ''}).` : ''), malas.length ? 'aviso' : 'ok')
+    $('i-cargar').textContent = `Cargar ${indPendientes.length} inducciones`
+    $('i-cargar').classList.remove('oculto')
+  }
+
+  async function cargarInducciones() {
+    if (!indPendientes.length) return
+    $('i-cargar').disabled = true
+    let nuevas = 0
+    for (let i = 0; i < indPendientes.length; i += 500) {
+      nota('nota-ind', `Cargando ${Math.min(i + 500, indPendientes.length)} de ${indPendientes.length}…`, 'aviso')
+      const { data, error } = await sb.from('inducciones')
+        .upsert(indPendientes.slice(i, i + 500), { onConflict: 'cedula,fecha_ejecucion', ignoreDuplicates: true })
+        .select('id')
+      if (error) { $('i-cargar').disabled = false; return nota('nota-ind', `Error al cargar (se alcanzaron a procesar ${i}): ${error.message}`, 'mal') }
+      nuevas += (data || []).length
+    }
+    const ya = indPendientes.length - nuevas
+    nota('nota-ind', `Listo: ${nuevas} inducción(es) nueva(s)` + (ya ? ` y ${ya} que ya estaban cargadas.` : '.') + ' El vigilante ya las ve.', 'ok')
+    indPendientes = []
+    $('i-cargar').disabled = false
+    $('i-cargar').classList.add('oculto')
+    $('i-archivo').value = ''
+    $('i-texto').textContent = '📄 Haga clic aquí para elegir el Excel'
+  }
+
+  // ---------------- Reporte de cierre ----------------
+  async function descargarReporte() {
+    const mes = $('r-mes').value
+    if (!mes) return nota('nota-rep', 'Elija el mes.', 'mal')
+    const [y, m] = mes.split('-').map(Number)
+    const inicio = new Date(y, m - 1, 1), fin = new Date(y, m, 1)
+    $('r-descargar').disabled = true
+    nota('nota-rep', 'Preparando el reporte…', 'aviso')
+    const filas = []
+    for (let desde = 0; ; desde += 1000) {
+      const { data, error } = await sb.from('vw_ss_registros')
+        .select('fecha_cargue, cedula, nombre, empresa, nit, decision, vigencia_desde, vigencia, motivo, registrado_por, anulado, motivo_anulacion, anulado_por, fecha_anulacion')
+        .eq('origen', 'formulario')
+        .gte('fecha_cargue', inicio.toISOString()).lt('fecha_cargue', fin.toISOString())
+        .order('fecha_cargue', { ascending: true })
+        .range(desde, desde + 999)
+      if (error) { $('r-descargar').disabled = false; return nota('nota-rep', 'No se pudo generar: ' + error.message, 'mal') }
+      filas.push(...data)
+      if (data.length < 1000) break
+    }
+    $('r-descargar').disabled = false
+    if (!filas.length) return nota('nota-rep', 'No hay registros en ese mes.', 'aviso')
+
+    const { data: gest } = await sb.rpc('nombres_gestores')
+    const nombres = new Map((gest || []).map(g => [String(g.email).toLowerCase(), g.nombre]))
+    const quien = correo => { if (!correo) return ''; return nombres.get(String(correo).toLowerCase()) || '' }
+
+    const fechaLocal = ts => { const d = new Date(ts); return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}` }
+    const hoja = filas.map(r => ({
+      'Fecha registro': fechaLocal(r.fecha_cargue),
+      'Hora': hora(r.fecha_cargue),
+      'Documento': r.cedula,
+      'Nombre': r.nombre || '',
+      'Empresa': r.empresa || '',
+      'NIT': r.nit || '',
+      'Decisión': r.decision === 'NO_AUTORIZADO' ? 'No autoriza' : 'Autoriza',
+      'Acceso desde': r.vigencia_desde ? fecha(r.vigencia_desde) : '',
+      'Acceso hasta': r.vigencia ? fecha(r.vigencia) : '',
+      'Motivo no autoriza': r.motivo || '',
+      'Registró (nombre)': quien(r.registrado_por),
+      'Registró (correo)': r.registrado_por || '',
+      'Anulado': r.anulado ? 'Sí' : 'No',
+      'Motivo anulación': r.motivo_anulacion || '',
+      'Anuló (nombre)': quien(r.anulado_por),
+      'Anuló (correo)': r.anulado_por || '',
+      'Fecha anulación': r.fecha_anulacion ? fechaLocal(r.fecha_anulacion) : ''
+    }))
+
+    const porGestor = new Map()
+    for (const r of filas) {
+      const g = r.registrado_por || '—'
+      const t = porGestor.get(g) || { 'Gestor': quien(g) || g, 'Correo': g, 'Total registros': 0, 'Autoriza': 0, 'No autoriza': 0, 'Anulados': 0 }
+      t['Total registros']++
+      if (r.anulado) t['Anulados']++
+      else if (r.decision === 'NO_AUTORIZADO') t['No autoriza']++
+      else t['Autoriza']++
+      porGestor.set(g, t)
+    }
+    const resumen = [...porGestor.values()].sort((a, b) => b['Total registros'] - a['Total registros'])
+    const total = resumen.reduce((acc, r) => { for (const k of ['Total registros', 'Autoriza', 'No autoriza', 'Anulados']) acc[k] += r[k]; return acc },
+      { 'Gestor': 'TOTAL', 'Correo': '', 'Total registros': 0, 'Autoriza': 0, 'No autoriza': 0, 'Anulados': 0 })
+    resumen.push(total)
+
+    const wb = XLSX.utils.book_new()
+    const ws1 = XLSX.utils.json_to_sheet(resumen)
+    ws1['!cols'] = [{ wch: 30 }, { wch: 36 }, { wch: 16 }, { wch: 10 }, { wch: 12 }, { wch: 10 }]
+    const ws2 = XLSX.utils.json_to_sheet(hoja)
+    ws2['!cols'] = [12, 7, 14, 30, 26, 14, 12, 13, 13, 34, 26, 32, 8, 30, 26, 30, 15].map(w => ({ wch: w }))
+    ws2['!autofilter'] = { ref: ws2['!ref'] }
+    XLSX.utils.book_append_sheet(wb, ws1, 'Resumen')
+    XLSX.utils.book_append_sheet(wb, ws2, 'Registros')
+    XLSX.writeFile(wb, `Reporte_ingreso_contratistas_${mes}.xlsx`)
+    nota('nota-rep', `Reporte descargado: ${filas.length} registros (${total['Autoriza']} autorizados, ${total['No autoriza']} no autorizados, ${total['Anulados']} anulados).`, 'ok')
+  }
+
+  // ---------------- Cargue del histórico ----------------
+  let histPendientes = []
+  function buscarCol(cab, prueba, excluir = []) { return cab.findIndex((c, i) => !excluir.includes(i) && prueba(c)) }
+
+  async function leerHistorico(file) {
+    histPendientes = []
+    $('h-cargar').classList.add('oculto')
+    $('h-texto').textContent = '📄 ' + file.name
+    nota('nota-hist', 'Leyendo el archivo…', 'aviso')
+    let filas
+    try {
+      const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true })
+      filas = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: null })
+    } catch (e) { return nota('nota-hist', 'No se pudo leer el archivo.', 'mal') }
+
+    let h = -1, c = {}
+    for (let i = 0; i < Math.min(filas.length, 15) && h < 0; i++) {
+      const cab = (filas[i] || []).map(normTxt)
+      const doc = buscarCol(cab, t => ['cedula', 'documento', 'numero de documento', 'numero de identificacion', 'identificacion', 'no. documento', 'no documento', 'cc'].includes(t) || t.startsWith('cedula') || t.includes('numero de identificacion') || t.includes('documento de identidad'))
+      const desde = buscarCol(cab, t => t.includes('desde') || t.includes('fecha inicio') || t.includes('fecha de inicio') || t === 'inicio')
+      const hasta = buscarCol(cab, t => !t.includes('desde') && !t.includes('inicio') && (t.includes('vigencia') || t.includes('hasta') || t.includes('fecha fin') || t.includes('fecha de fin') || t.includes('vence') || t.includes('vencimiento')), [desde])
+      if (doc >= 0 && hasta >= 0) {
+        h = i
+        c = { doc, desde, hasta,
+              nombre: buscarCol(cab, t => t.includes('nombre') && !t.includes('empresa')),
+              nit: buscarCol(cab, t => t === 'nit' || t.startsWith('nit ') || t.includes(' nit')),
+              empresa: buscarCol(cab, t => t.includes('empresa') || t.includes('razon social') || t.includes('proveedor')) }
+      }
+    }
+    if (h < 0) {
+      const cab = (filas[0] || []).filter(Boolean).join(', ')
+      return nota('nota-hist', `No encontré las columnas de documento y vigencia. Columnas del archivo: ${cab || '(vacías)'}. Necesito una columna «Cédula» (o Documento) y una «Vigencia» (o Hasta / Fecha fin).`, 'mal')
+    }
+
+    const malas = []
+    for (let i = h + 1; i < filas.length; i++) {
+      const f = filas[i]
+      if (!f || f.every(x => x === null || x === '')) continue
+      let doc = f[c.doc]
+      if (typeof doc === 'number' && Number.isInteger(doc)) doc = String(doc)
+      doc = String(doc ?? '').trim().replace(/\.0+$/, '').replace(/[^0-9A-Za-z]/g, '')
+      const vig = aFecha(f[c.hasta]), des = c.desde >= 0 ? aFecha(f[c.desde]) : null
+      if (!doc || !vig || (des && des > vig)) { malas.push(i + 1); continue }
+      const txt = k => (c[k] >= 0 && f[c[k]] !== null ? String(f[c[k]]).trim() : null)
+      histPendientes.push({ cedula: doc, nombre: txt('nombre'), nit: txt('nit'), empresa: txt('empresa'), vigencia: vig, vigencia_desde: des })
+    }
+    if (!histPendientes.length) return nota('nota-hist', 'El archivo no tiene filas válidas con documento y vigencia.', 'mal')
+    const ej = histPendientes[0]
+    nota('nota-hist', `Encontré ${histPendientes.length} registros. Ejemplo: ${ej.cedula} · ${ej.nombre || 'sin nombre'} · hasta ${fecha(ej.vigencia)}.` +
+      (malas.length ? ` ${malas.length} fila(s) sin documento o con fecha no válida se omitirán (filas ${malas.slice(0, 10).join(', ')}${malas.length > 10 ? '…' : ''}).` : ''), malas.length ? 'aviso' : 'ok')
+    $('h-cargar').textContent = `Cargar ${histPendientes.length} registros del histórico`
+    $('h-cargar').classList.remove('oculto')
+  }
+
+  async function cargarHistorico() {
+    if (!histPendientes.length) return
+    $('h-cargar').disabled = true
+    let nuevas = 0
+    for (let i = 0; i < histPendientes.length; i += 500) {
+      nota('nota-hist', `Cargando ${Math.min(i + 500, histPendientes.length)} de ${histPendientes.length}…`, 'aviso')
+      const { data, error } = await sb.rpc('cargar_historico', { p_filas: histPendientes.slice(i, i + 500) })
+      if (error) { $('h-cargar').disabled = false; return nota('nota-hist', `Error al cargar (se alcanzaron a procesar ${i}): ${error.message}`, 'mal') }
+      nuevas += data.nuevas
+    }
+    const ya = histPendientes.length - nuevas
+    nota('nota-hist', `Listo: ${nuevas} registro(s) nuevo(s)` + (ya ? ` y ${ya} que ya estaban cargados o repetidos en el archivo.` : '.'), 'ok')
+    histPendientes = []
+    $('h-cargar').disabled = false
+    $('h-cargar').classList.add('oculto')
+    $('h-archivo').value = ''
+    $('h-texto').textContent = '📄 Haga clic aquí para elegir el Excel del histórico'
+  }
+
+  function campoFaltante(id, texto) { nota('nota-form', texto, 'mal'); $(id).focus() }
+
+  async function cargarLista() {
+    const inicio = new Date(); inicio.setHours(0, 0, 0, 0)
+    const { data, error } = await sb.from('vw_ss_registros')
+      .select('id, cedula, nombre, empresa, vigencia, vigencia_desde, fecha_cargue, registrado_por, anulado, motivo_anulacion, decision, motivo')
+      .eq('origen', 'formulario')
+      .gte('fecha_cargue', inicio.toISOString())
+      .order('fecha_cargue', { ascending: false }).limit(200)
+    if (error) { $('lista').innerHTML = `<tr><td colspan="8" class="vacio">No se pudo cargar la lista.</td></tr>`; return }
+    const activas = data.filter(r => !r.anulado).length
+    $('conteo').textContent = data.length ? `${activas} activa${activas === 1 ? '' : 's'}` : ''
+    $('lista').innerHTML = data.length ? data.map(r => `
+      <tr class="${r.anulado ? 'anulado' : ''}">
+        <td class="num">${hora(r.fecha_cargue)}</td>
+        <td class="num tachable">${esc(r.cedula)}</td>
+        <td class="tachable">${esc(r.nombre)}${r.anulado ? `<span class="motivo">Anulado: ${esc(r.motivo_anulacion)}</span>` : ''}</td>
+        <td class="tachable">${esc(r.empresa || '—')}</td>
+        <td>${r.decision === 'NO_AUTORIZADO'
+              ? `<span class="chip mal">No autoriza</span><span class="motivo-dec">${esc(r.motivo)}</span>`
+              : '<span class="chip ok">Autoriza</span>'}</td>
+        <td class="num tachable">${r.decision === 'NO_AUTORIZADO' ? '—' : (r.vigencia_desde ? fecha(r.vigencia_desde) + ' – ' : 'hasta ') + fecha(r.vigencia)}</td>
+        <td>${esc((r.registrado_por || '').split('@')[0])}</td>
+        <td>${r.anulado ? '' : `<button type="button" class="anular" data-id="${r.id}" data-nombre="${esc(r.nombre)}">Anular</button>`}</td>
+      </tr>`).join('')
+      : `<tr><td colspan="8" class="vacio">Todavía no hay autorizaciones registradas hoy.</td></tr>`
+  }
+
+  async function anular(id, nombre) {
+    const motivo = prompt(`Anular el registro de ${nombre}.\nEscriba el motivo (queda en el historial):`)
+    if (motivo === null) return
+    if (!motivo.trim()) return alert('El motivo es obligatorio para anular.')
+    const { error } = await sb.from('ss_anulaciones').insert({ ss_id: Number(id), motivo: motivo.trim() })
+    if (error) return alert('No se pudo anular: ' + error.message)
+    cargarLista()
+  }
+
+  // ---------------- Eventos ----------------
+  const enviarLogin = () => modoCrear ? crearCuenta() : entrar()
+  $('entrar').addEventListener('click', enviarLogin)
+  $('clave').addEventListener('keydown', e => { if (e.key === 'Enter') enviarLogin() })
+  $('clave2').addEventListener('keydown', e => { if (e.key === 'Enter') enviarLogin() })
+  $('cambiar-modo').addEventListener('click', alternarModo)
+  $('btn-usuarios').addEventListener('click', abrirUsuarios)
+  $('btn-clave').addEventListener('click', cambiarMiClave)
+  $('volver').addEventListener('click', cerrarUsuarios)
+  $('u-agregar').addEventListener('click', agregarUsuario)
+  $('v-agregar').addEventListener('click', agregarVarios)
+  $('i-archivo').addEventListener('change', e => { if (e.target.files[0]) leerInducciones(e.target.files[0]) })
+  $('i-cargar').addEventListener('click', cargarInducciones)
+  $('r-descargar').addEventListener('click', descargarReporte)
+  $('h-archivo').addEventListener('change', e => { if (e.target.files[0]) leerHistorico(e.target.files[0]) })
+  $('h-cargar').addEventListener('click', cargarHistorico)
+  $('f-desde').value = hoyISO()
+  $('r-mes').value = hoyISO().slice(0, 7)
+  $('lista-usuarios').addEventListener('click', e => { const b = e.target.closest('[data-u]'); if (b) accionUsuario(b) })
+  $('salir').addEventListener('click', async () => { await sb.auth.signOut(); mostrarLogin() })
+  $('f-cedula').addEventListener('blur', buscarCedula)
+  $('f-cedula').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); buscarCedula(); $('f-nombre').focus() } })
+  $('f-empresa').addEventListener('change', () => {
+    const nit = empresas.get($('f-empresa').value.trim())
+    if (nit && !$('f-nit').value) $('f-nit').value = nit
+  })
+  $('f-vigencia').addEventListener('keydown', e => { if (e.key === 'Enter') registrar() })
+  $('registrar').addEventListener('click', registrar)
+  $('d-si').addEventListener('click', () => fijarDecision(true))
+  $('d-no').addEventListener('click', () => fijarDecision(false))
+  $('lista').addEventListener('click', e => {
+    const b = e.target.closest('.anular')
+    if (b) anular(b.dataset.id, b.dataset.nombre)
+  })
+
+  verificarSesion()
+</script>
+</body>
+</html>
